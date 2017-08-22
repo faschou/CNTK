@@ -28,7 +28,7 @@ namespace CNTKLibraryCSEvalExamples
         /// - how to retrieve evaluation result and retrieve output data in dense format.
         /// </summary>
         /// <param name="device">Specify on which device to run the evaluation.</param>
-        public static bool EvaluationSingleImage(DeviceDescriptor device)
+        public static void EvaluationSingleImage(DeviceDescriptor device)
         {
             try
             {
@@ -37,17 +37,16 @@ namespace CNTKLibraryCSEvalExamples
                 // Load the model.
                 // The model resnet20.dnn is trained by <CNTK>/Examples/Image/Classification/ResNet/Python/Models/TrainResNet_CIFAR10.py
                 // Please see README.md in <CNTK>/Examples/Image/Classification/ResNet about how to train the model.
-                string modelFilePath = "faster_rcnn_eval_AlexNet_e2e.model";
+                string modelFilePath = "resnet20.dnn";
                 ThrowIfFileNotExist(modelFilePath, string.Format("Error: The model '{0}' does not exist. Please follow instructions in README.md in <CNTK>/Examples/Image/Classification/ResNet to create the model.", modelFilePath));
                 Function modelFunc = Function.Load(modelFilePath, device);
 
                 // Get input variable. The model has only one single input.
                 // The same way described above for output variable can be used here to get input variable by name.
-                Variable inputImgVar = modelFunc.Arguments.First();
-                Variable inputDimsVar = modelFunc.Arguments.Last();
+                Variable inputVar = modelFunc.Arguments.Single();
 
                 // Get shape data for the input variable
-                NDShape inputShape = inputImgVar.Shape;
+                NDShape inputShape = inputVar.Shape;
                 int imageWidth = inputShape[0];
                 int imageHeight = inputShape[1];
                 int imageChannels = inputShape[2];
@@ -55,10 +54,8 @@ namespace CNTKLibraryCSEvalExamples
 
                 // The model has only one output.
                 // If the model have more than one output, use the following way to get output variable by name.
-                // Variable cls_pred = modelFunc.Outputs.Where(variable => string.Equals(variable.Name, outputName)).Single();
-                Variable cls_pred = modelFunc.Outputs.Where(x => x.Name == "cls_pred").First();
-                Variable rpn_rois = modelFunc.Outputs.Where(x => x.Name == "rpn_rois").First();
-                Variable bbox_regr = modelFunc.Outputs.Where(x => x.Name == "bbox_regr").First();
+                // Variable outputVar = modelFunc.Outputs.Where(variable => string.Equals(variable.Name, outputName)).Single();
+                Variable outputVar = modelFunc.Output;
 
                 var inputDataMap = new Dictionary<Variable, Value>();
                 var outputDataMap = new Dictionary<Variable, Value>();
@@ -66,39 +63,34 @@ namespace CNTKLibraryCSEvalExamples
                 // Image preprocessing to match input requirements of the model.
                 // This program uses images from the CIFAR-10 dataset for evaluation.
                 // Please see README.md in <CNTK>/Examples/Image/DataSets/CIFAR-10 about how to download the CIFAR-10 dataset.
-                string sampleImage = "WIN_20160803_11_28_42_Pro.jpg";
+                string sampleImage = "00000.png";
                 ThrowIfFileNotExist(sampleImage, string.Format("Error: The sample image '{0}' does not exist. Please see README.md in <CNTK>/Examples/Image/DataSets/CIFAR-10 about how to download the CIFAR-10 dataset.", sampleImage));
                 Bitmap bmp = new Bitmap(Bitmap.FromFile(sampleImage));
                 var resized = bmp.Resize((int)imageWidth, (int)imageHeight, true);
                 List<float> resizedCHW = resized.ParallelExtractCHW();
 
                 // Create input data map
-                var inputImgVal = Value.CreateBatch(inputImgVar.Shape, resizedCHW, device);
-                inputDataMap.Add(inputImgVar, inputImgVal);
-                var inputDimsVal = Value.CreateBatch(inputDimsVar.Shape, new List<float>(new float[] { 850.0f, 850.0f, 478.0f, 850.0f, 1080.0f, 1920.0f }), device);
-                inputDataMap.Add(inputDimsVar, inputDimsVal);
+                var inputVal = Value.CreateBatch(inputVar.Shape, resizedCHW, device);
+                inputDataMap.Add(inputVar, inputVal);
 
                 // Create output data map. Using null as Value to indicate using system allocated memory.
                 // Alternatively, create a Value object and add it to the data map.
-                outputDataMap.Add(cls_pred, null);
-                outputDataMap.Add(rpn_rois, null);
-                outputDataMap.Add(bbox_regr, null);
+                outputDataMap.Add(outputVar, null);
 
                 // Start evaluation on the device
                 modelFunc.Evaluate(inputDataMap, outputDataMap, device);
 
                 // Get evaluate result as dense output
-                var outputVal = outputDataMap[cls_pred];
-                var outputData = outputVal.GetDenseData<float>(cls_pred);
+                var outputVal = outputDataMap[outputVar];
+                var outputData = outputVal.GetDenseData<float>(outputVar);
 
-                PrintOutput(outputVal.Shape.SubShape(0, cls_pred.Shape.Rank).TotalSize, outputData);
+                PrintOutput(outputVar.Shape.TotalSize, outputData);
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Error: {0}\nCallStack: {1}\n Inner Exception: {2}", ex.Message, ex.StackTrace, ex.InnerException != null ? ex.InnerException.Message : "No Inner Exception");
                 throw ex;
             }
-            return false;
         }
 
         /// <summary>
@@ -144,7 +136,7 @@ namespace CNTKLibraryCSEvalExamples
 
                 // The model has only one output.
                 // If the model have more than one output, use the following way to get output variable by name.
-                // Variable cls_pred = modelFunc.Outputs.Where(variable => string.Equals(variable.Name, outputName)).Single();
+                // Variable outputVar = modelFunc.Outputs.Where(variable => string.Equals(variable.Name, outputName)).Single();
                 Variable outputVar = modelFunc.Output;
 
                 var inputDataMap = new Dictionary<Variable, Value>();
@@ -305,7 +297,7 @@ namespace CNTKLibraryCSEvalExamples
 
                 // Get input variable. The model has only one single input.
                 // If the model have more than one input, use the following way to get input variable by name.
-                // Variable inputImgVar = modelFunc.Arguments.Where(variable => string.Equals(variable.Name, inputName)).Single();
+                // Variable inputVar = modelFunc.Arguments.Where(variable => string.Equals(variable.Name, inputName)).Single();
                 Variable inputVar = modelFunc.Arguments.Single();
 
                 // Get shape data for the input variable
@@ -317,7 +309,7 @@ namespace CNTKLibraryCSEvalExamples
 
                 // The model has only one output.
                 // If the model have more than one output, use the following way to get output variable by name.
-                // Variable cls_pred = modelFunc.Outputs.Where(variable => string.Equals(variable.Name, outputName)).Single();
+                // Variable outputVar = modelFunc.Outputs.Where(variable => string.Equals(variable.Name, outputName)).Single();
                 Variable outputVar = modelFunc.Output;
 
                 var inputDataMap = new Dictionary<Variable, Value>();

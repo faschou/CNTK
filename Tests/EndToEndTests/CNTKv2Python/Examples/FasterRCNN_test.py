@@ -52,7 +52,6 @@ def run_fasterrcnn_grocery_training(device_id, e2e):
         extPath = os.environ['CNTK_EXTERNAL_TESTDATA_SOURCE_DIRECTORY']
         cfg['BASE_MODEL_PATH'] = os.path.join(extPath, "PreTrainedModels", "AlexNet", "v0", "AlexNet.model")
     else:
-        #cfg['BASE_MODEL_PATH'] = os.path.join(abs_path, *"../../../../Examples/Image/PretrainedModels/AlexNet.model".split("/"))
         model_file = os.path.join(abs_path, *"../../../../Examples/Image/PretrainedModels/AlexNet.model".split("/"))
 
     from FasterRCNN import train_faster_rcnn_e2e, eval_faster_rcnn_mAP

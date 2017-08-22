@@ -53,7 +53,6 @@ if __name__ == '__main__':
     # Currently supported detectors: 'FastRCNN', 'FasterRCNN'
     args = sys.argv
     detector_name = get_detector_name(args)
-
     cfg = get_configuration(detector_name)
 
     # train and test

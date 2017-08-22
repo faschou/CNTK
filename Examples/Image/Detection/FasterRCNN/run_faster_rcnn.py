@@ -4,7 +4,7 @@
 # for full license information.
 # ==============================================================================
 
-import os, sys
+import os
 import numpy as np
 import cntk
 from FasterRCNN_train import prepare, train_faster_rcnn, store_eval_model_with_native_udf
