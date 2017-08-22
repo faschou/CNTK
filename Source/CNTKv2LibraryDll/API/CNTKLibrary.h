@@ -2867,14 +2867,17 @@ namespace CNTK
         void ResizeOutputBuffer(const Variable& outputVariable, std::vector<std::vector<ElementType>>& sequences)
         {
             auto shape = outputVariable.Shape();
-            if (shape.IsUnknown() || shape.HasUnboundDimension())
-                RuntimeError("The outputVariable '%S' shape '%S' is unknown shape, has inferred dimension or free dimension for at least one axis.",
+            if (shape.IsUnknown())
+                RuntimeError("The outputVariable '%S' shape '%S' is unknown shape.",
                               outputVariable.AsString().c_str(), shape.AsString().c_str());
 
             size_t numOfSequences;
             size_t maxSequenceLen;
+            // Check compatibility of 'this' value and the outputVariable, and get sequence and batch length.
             std::tie(maxSequenceLen, numOfSequences) = GetSequenceAndBatchLength(outputVariable);
 
+            // Get the shape in the Value, since the shape of outputVariable might contain inferred/free dimension.
+            shape = Shape().SubShape(0, outputVariable.Shape().Rank());
             // Calculate the number of elements is needed to represent a sample in output buffer.
             // For dense output, it is the total size of the shape.
             // For one-hot output, only 1 index is needed to represent the sample.
