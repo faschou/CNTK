@@ -110,32 +110,12 @@ def test_native_fasterrcnn_eval(tmpdir, device_id):
 
 @win35_linux34
 def test_fasterrcnn_grocery_training_4stage(device_id):
-    from config import cfg
-    cfg["CNTK"].FORCE_DETERMINISTIC = True
-    cfg["CNTK"].DEBUG_OUTPUT = False
-    cfg["CNTK"].VISUALIZE_RESULTS = False
-    cfg["CNTK"].FAST_MODE = True
-    cfg["CNTK"].MAP_FILE_PATH = grocery_path
-
-    from FasterRCNN.FasterRCNN_train import prepare, train_faster_rcnn
-    from FasterRCNN.FasterRCNN_eval import compute_test_set_aps
-    prepare(cfg, False)
-
-    if cntk_device(device_id).type() != DeviceKind_GPU:
-        pytest.skip('test only runs on GPU')  # it runs very slow in CPU
-    try_set_default_device(cntk_device(device_id))
-
-    np.random.seed(seed=3)
-    trained_model = train_faster_rcnn(cfg)
-    eval_results = compute_test_set_aps(trained_model, cfg)
-    meanAP = np.nanmean(list(eval_results.values()))
-    print('meanAP={}'.format(meanAP))
-    assert meanAP > 0.01
-
-@win35_linux34
-def test_fasterrcnn_grocery_training_4stage(device_id):
     run_fasterrcnn_grocery_training(device_id, e2e = False)
 
 @win35_linux34
 def test_fasterrcnn_grocery_training_e2e(device_id, e2e=True):
     run_fasterrcnn_grocery_training(device_id, e2e = True)
+
+if __name__ == '__main__':
+    run_fasterrcnn_grocery_training(0, e2e = False)
+    #run_fasterrcnn_grocery_training(0, e2e = True)
