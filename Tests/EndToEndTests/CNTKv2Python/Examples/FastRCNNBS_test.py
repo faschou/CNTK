@@ -81,3 +81,8 @@ def test_fastrcnn_grocery_training(device_id):
 
     from B3_VisualizeOutputROIs import visualize_output_rois
     assert visualize_output_rois(testing=True)
+
+if __name__ == '__main__':
+    #test_fastrcnn_grocery_training(0)
+    #test_fastrcnn_with_config_file(0)
+    test_fastrcnn_grocery_visualization()
