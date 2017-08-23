@@ -10,7 +10,7 @@ import sys
 import pytest
 
 abs_path = os.path.dirname(os.path.abspath(__file__))
-notebook = os.path.join(abs_path, "..", "..", "..", "..", "Examples","Image","Detection","FastRCNN", "CNTK_FastRCNN_Eval.ipynb")
+notebook = os.path.join(abs_path, "..", "..", "..", "..", "Examples","Image","Detection","FastRCNN", "BrainScript", "CNTK_FastRCNN_Eval.ipynb")
 
 sys.path.append(abs_path)
 
@@ -52,3 +52,12 @@ def test_cntk_fastrcnn_eval_evalCorrect(nb):
                      'text' in cell.outputs[0] and
                      re.search('Evaluation result:', get_output_stream_from_cell(cell))]
     assert len(testCells) == 1
+
+if __name__ == "__main__":
+    import io
+    from nbformat import read
+    with io.open(notebook, 'r', encoding='utf-8') as f:
+        nb = read(f, 4)
+    test_cntk_fastrcnn_eval_noErrors(nb)
+    test_cntk_fastrcnn_eval_evalCorrect(nb)
+
