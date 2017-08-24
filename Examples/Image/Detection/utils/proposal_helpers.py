@@ -1,9 +1,21 @@
+import os, sys
+abs_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(abs_path, ".."))
+
 import numpy as np
-from dlib import find_candidate_object_locations
+import cv2
 from utils.rpn.bbox_transform import bbox_transform
 from utils.cython_modules.cython_bbox import bbox_overlaps
 
 random_seed = 23
+
+try:
+    from dlib import find_candidate_object_locations
+    dlib_available = True
+except:
+    dlib_available = False
+
+from utils.selectivesearch.selectivesearch import selective_search
 
 def compute_image_stats(img_width, img_height, pad_width, pad_height):
     do_scale_w = img_width > img_height
@@ -23,41 +35,94 @@ def compute_image_stats(img_width, img_height, pad_width, pad_height):
     right = pad_width - left - target_w
     return [target_w, target_h, img_width, img_height, top, bottom, left, right, scale_factor]
 
+def imresize(img, scale, interpolation = cv2.INTER_LINEAR):
+    return cv2.resize(img, (0,0), fx=scale, fy=scale, interpolation=interpolation)
 
-def compute_proposals(img, num_proposals, min_w, min_h):
-    all_rects = []
-    min_size = min_w * min_h
-    find_candidate_object_locations(img, all_rects, min_size=min_size)
+def filterRois(rects, maxWidth, maxHeight, roi_minNrPixels, roi_maxNrPixels,
+               roi_minDim, roi_maxDim, roi_maxAspectRatio):
+    filteredRects = []
+    filteredRectsSet = set()
+    for rect in rects:
+        if tuple(rect) in filteredRectsSet: # excluding rectangles with same co-ordinates
+            continue
+
+        x, y, x2, y2 = rect
+        w = x2 - x
+        h = y2 - y
+        assert(w>=0 and h>=0)
+
+        # apply filters
+        if h == 0 or w == 0 or \
+           x2 > maxWidth or y2 > maxHeight or \
+           w < roi_minDim or h < roi_minDim or \
+           w > roi_maxDim or h > roi_maxDim or \
+           w * h < roi_minNrPixels or w * h > roi_maxNrPixels or \
+           w / h > roi_maxAspectRatio or h / w > roi_maxAspectRatio:
+               continue
+        filteredRects.append(rect)
+        filteredRectsSet.add(tuple(rect))
+
+    # could combine rectangles using non-maxima surpression or with similar co-ordinates
+    # groupedRectangles, weights = cv2.groupRectangles(np.asanyarray(rectsInput, np.float).tolist(), 1, 0.3)
+    # groupedRectangles = nms_python(np.asarray(rectsInput, np.float), 0.5)
+    assert(len(filteredRects) > 0)
+    return filteredRects
+
+def compute_proposals(img, num_proposals, cfg, use_dlib=False):
+
+    img_w = len(img[0])
+    img_h = len(img)
+
+    # scale : int - Free parameter. Higher means larger clusters in felzenszwalb segmentation.
+    # sigma : float - Width of Gaussian kernel for felzenszwalb segmentation.
+    # min_size : int - Minimum component size for felzenszwalb segmentation.
+    roi_ss_scale = 100
+    roi_ss_sigma = 1.2
+    roi_ss_min_size = 20
+    roi_ss_img_size = 200
+    roi_min_side_rel = 0.04
+    roi_max_side_rel = 0.4
+    roi_min_area_rel = 2 * roi_min_side_rel * roi_min_side_rel
+    roi_max_area_rel = 0.33 * roi_max_side_rel * roi_max_side_rel
+    roi_max_aspect_ratio = 4.0
+    roi_grid_aspect_ratios = [1.0, 2.0, 0.5]
+
+    scale = 1.0 * roi_ss_img_size / max(img.shape[:2])
+    img = cv2.resize(img, (0,0), fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+
+    roi_min_side = roi_min_side_rel * roi_ss_img_size
+    roi_max_side = roi_max_side_rel * roi_ss_img_size
+    roi_min_area = roi_min_area_rel * roi_ss_img_size * roi_ss_img_size
+    roi_max_area = roi_max_area_rel * roi_ss_img_size * roi_ss_img_size
 
     rects = []
-    for k, d in enumerate(all_rects):
-        w = d.right() - d.left()
-        h = d.bottom() - d.top()
-        if w < min_w or h < min_h:
-            continue
-        rects.append([d.left(), d.top(), d.right(), d.bottom()])
+    if use_dlib and dlib_available:
+        all_rects = []
+        find_candidate_object_locations(img, all_rects, min_size=int(roi_min_area))
+        for k, d in enumerate(all_rects):
+            rects.append([d.left(), d.top(), d.right(), d.bottom()])
+    else:
+        _, ssRois = selective_search(img, scale=roi_ss_scale, sigma=roi_ss_sigma, min_size=roi_ss_min_size)
+        for ssRoi in ssRois:
+            x, y, w, h = ssRoi['rect']
+            rects.append([x,y,x+w,y+h])
 
-    np_rects = np.array(rects)
-    num_rects = np_rects.shape[0]
+    filtered_rects = filterRois(rects, img_w, img_h, roi_min_area, roi_max_area, roi_min_side, roi_max_side, roi_max_aspect_ratio)
+    scaled_rects = np.array(filtered_rects) * (1/scale)
+
+    num_rects = scaled_rects.shape[0]
     np.random.seed(random_seed)
     if num_rects < num_proposals:
-        img_w = len(img[0])
-        img_h = len(img)
-        grid_proposals = compute_grid_proposals(num_proposals - len(rects), img_w, img_h, min_w, min_h)
-        np_rects = np.vstack([np_rects, grid_proposals])
-    elif len(rects) > num_proposals:
+        grid_proposals = compute_grid_proposals(num_proposals - num_rects, img_w, img_h, roi_min_side, roi_max_side, roi_grid_aspect_ratios)
+        scaled_rects = np.vstack([scaled_rects, grid_proposals])
+    elif num_rects > num_proposals:
         keep_inds = range(num_rects)
         keep_inds = np.random.choice(keep_inds, size=num_proposals, replace=False)
-        np_rects = np_rects[keep_inds]
+        scaled_rects = scaled_rects[keep_inds]
 
-    return np_rects
+    return scaled_rects
 
-def compute_grid_proposals(num_proposals, img_w, img_h, min_w, min_h, max_w=None, max_h=None, aspect_ratios = [1.0], shuffle=True):
-    min_wh = max(min_w, min_h)
-    max_wh = min(img_h, img_w) / 2
-    if max_w is not None: max_wh = min(max_wh, max_w)
-    if max_h is not None: max_wh = min(max_wh, max_h)
-
+def compute_grid_proposals(num_proposals, img_w, img_h, min_wh, max_wh, aspect_ratios = [1.0, 2.0, 0.5], shuffle=True):
     rects = []
     iter = 0
     while len(rects) < num_proposals:
@@ -70,6 +135,7 @@ def compute_grid_proposals(num_proposals, img_w, img_h, min_w, min_h, max_w=None
         take = min(num_proposals - len(rects), len(new_rects))
         new_rects = new_rects[:take]
         rects.extend(new_rects)
+        iter = iter + 1
 
     np_rects = np.array(rects)
     num_rects = np_rects.shape[0]
@@ -183,17 +249,14 @@ class ProposalProvider:
             return self._proposal_cfg['NUM_ROI_PROPOSALS']
 
     def get_proposals(self, index, img=None):
-        #import pdb; pdb.set_trace()
         if index in self._proposal_dict:
             return self._proposal_dict[index]
         else:
             return self._compute_proposals(img)
 
     def _compute_proposals(self, img):
-        min_w = self._proposal_cfg['PROPOSALS_MIN_W']
-        min_h = self._proposal_cfg['PROPOSALS_MIN_H']
         num_proposals = self._proposal_cfg.NUM_ROI_PROPOSALS
-        return compute_proposals(img, num_proposals, min_w, min_h)
+        return compute_proposals(img, num_proposals, self._proposal_cfg)
 
 if __name__ == '__main__':
     import cv2
@@ -203,12 +266,12 @@ if __name__ == '__main__':
     # 0.18 sec for 4000
     # 0.15 sec for 2000
     # 0.13 sec for 1000
-    num_proposals = 2000
-    num_runs = 100
+    num_proposals = 20 #2000
+    num_runs = 1 #100
     import time
     start = int(time.time())
     for i in range(num_runs):
-        proposals = compute_proposals(img, num_proposals, 20, 20)
+        proposals = compute_proposals(img, num_proposals, cfg=None)
     total = int(time.time() - start)
     print ("time: {}".format(total / (1.0 * num_runs)))
 

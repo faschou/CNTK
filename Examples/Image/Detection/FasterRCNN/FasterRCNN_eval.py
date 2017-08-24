@@ -15,7 +15,7 @@ from utils.map_helpers import evaluate_detections
 from utils.plot_helpers import load_resize_and_pad, resize_and_pad, visualize_detections
 from utils.rpn.bbox_transform import regress_rois
 from utils.od_mb_source import ObjectDetectionMinibatchSource
-from utils.proposal_helpers import ProposalProvider, compute_proposals, compute_image_stats
+from utils.proposal_helpers import ProposalProvider, compute_image_stats
 
 class FasterRCNN_Evaluator:
     def __init__(self, eval_model, cfg):

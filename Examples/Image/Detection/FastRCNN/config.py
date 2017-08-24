@@ -16,19 +16,19 @@ __C.CNTK = edict()
 __C.TRAIN = edict()
 
 # If set to 'True' training will be skipped if a trained model exists already
-__C.CNTK.MAKE_MODE = True
+__C.CNTK.MAKE_MODE = False
 # set to 'True' to use deterministic algorithms
 __C.CNTK.FORCE_DETERMINISTIC = False
 # set to 'True' to run only a single epoch
-__C.CNTK.FAST_MODE = True
+__C.CNTK.FAST_MODE = False
 # Debug parameters
-__C.CNTK.DEBUG_OUTPUT = False
+__C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
 
 # Learning parameters
 __C.CNTK.L2_REG_WEIGHT = 0.0005
 __C.CNTK.MOMENTUM_PER_MB = 0.9
-__C.CNTK.MAX_EPOCHS = 15 # use more epochs and more ROIs (NUM_ROI_PROPOSALS) for better results
+__C.CNTK.MAX_EPOCHS = 20 # use more epochs and more ROIs (NUM_ROI_PROPOSALS) for better results
 __C.CNTK.LR_FACTOR = 1.0
 __C.CNTK.LR_PER_SAMPLE = [0.001] * 10 + [0.0001] * 10 + [0.00001]
 # The learning rate multiplier for all bias weights
